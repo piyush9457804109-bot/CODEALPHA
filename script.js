@@ -1,90 +1,90 @@
 document.addEventListener('DOMContentLoaded', function() {
     
-    // grab DOM elements
-    const tgs = document.querySelectorAll('.btn');
-    const cards = document.querySelectorAll('.pic-box');
-    const popup = document.getElementById('gallery-popup');
-    const popupImg = document.getElementById('popup-img');
+    const display = document.getElementById('output');
+    const buttons = document.querySelectorAll('.btn');
     
-    let activeIndex = 0;
-    let currentPool = []; // tracks what's currently filtered for the slider
+    let currentInput = ''; 
 
-    // set up initial pool of pictures
-    refreshPool();
-
-    // --- Category Filters ---
-    tgs.forEach(button => {
-        button.addEventListener('click', () => {
-            // toggle active class on tabs
-            document.querySelector('.btn.active').classList.remove('active');
-            button.classList.add('active');
-
-            let category = button.getAttribute('data-cat');
-
-            cards.forEach(card => {
-                if(category === 'all' || card.classList.contains(category)) {
-                    card.classList.remove('hidden');
-                } else {
-                    card.classList.add('hidden');
-                }
-            });
-
-            refreshPool(); // update slider array layout
+    // Listen for UI clicks
+    buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            let value = btn.getAttribute('data-val');
+            handleInput(value);
         });
     });
 
-    function refreshPool() {
-        currentPool = Array.from(cards).filter(item => !item.classList.contains('hidden'));
-    }
+    // Bonus: Physical Keyboard Mapping
+    document.addEventListener('keydown', (e) => {
+        let key = e.key;
 
-    // --- Lightbox Trigger ---
-    cards.forEach(card => {
-        card.addEventListener('click', () => {
-            activeIndex = currentPool.indexOf(card);
-            let srcStr = card.querySelector('img').src;
-            
-            popupImg.src = srcStr;
-            popup.classList.add('show');
-        });
-    });
+        // translate keyboard strings to target math codes
+        if (key === 'Enter') key = '=';
+        if (key === 'Escape') key = 'C';
+        if (key === 'Backspace') key = 'back';
+        if (key === 'X' || key === 'x') key = '*';
 
-    // Close controls
-    document.querySelector('.close-popup').addEventListener('click', () => {
-        popup.classList.remove('show');
-    });
-
-    popup.addEventListener('click', (e) => {
-        if(e.target === popup) {
-            popup.classList.remove('show');
+        // Check if it's a valid key option we allow
+        const validKeys = ['0','1','2','3','4','5','6','7','8','9','+','-','*','/','.','=','C','back'];
+        if (validKeys.includes(key)) {
+            e.preventDefault(); // stop browser scrolling on space/arrows
+            handleInput(key);
         }
     });
 
-    // --- Next / Prev Slider Logic ---
-    function shiftSlide(step) {
-        if (currentPool.length === 0) return;
-
-        activeIndex += step;
-
-        // handle boundary loops
-        if (activeIndex >= currentPool.length) {
-            activeIndex = 0;
-        } else if (activeIndex < 0) {
-            activeIndex = currentPool.length - 1;
-        }
-
-        // update image source
-        popupImg.src = currentPool[activeIndex].querySelector('img').src;
-    }
-
-    document.querySelector('.right-arrow').addEventListener('click', () => shiftSlide(1));
-    document.querySelector('.left-arrow').addEventListener('click', () => shiftSlide(-1));
-
-    // hotkeys for lazy users
-    document.addEventListener('keydown', (event) => {
-        if (!popup.classList.contains('show')) return;
+    // Core Processing Machine
+    function handleInput(val) {
         
-        if (event.key === 'ArrowRight') shiftSlide(1);
-        if (event.key === 'ArrowLeft') shiftSlide(-1);
-        if (event.key === 'Escape') popup.classList.remove('show');
-    });
+        if (val === 'C') {
+            currentInput = '';
+            display.innerText = '0';
+            return;
+        }
+
+        if (val === 'back') {
+            // strip away the last typed item
+            currentInput = currentInput.slice(0, -1);
+            display.innerText = currentInput || '0';
+            return;
+        }
+
+        if (val === '=') {
+            if (currentInput === '') return;
+            
+            try {
+                // Parse calculation strings securely without raw eval vulnerabilities
+                // Uses Function context workaround to math evaluate the pure equation
+                let calculation = Function('"use strict"; return (' + currentInput + ')')();
+                
+                // Fix annoying floating decimal issues (e.g. 0.1 + 0.2 = 0.300000004)
+                if (calculation.toString().includes('.') && calculation.toString().split('.')[1].length > 4) {
+                    calculation = Number(calculation.toFixed(4));
+                }
+
+                display.innerText = calculation;
+                currentInput = calculation.toString(); // let user continue from their answer
+            } catch (err) {
+                display.innerText = 'Error';
+                currentInput = '';
+            }
+            return;
+        }
+
+        // Prevent double trailing dots/operators crashing things
+        const ops = ['+', '-', '*', '/'];
+        if (ops.includes(val) && ops.includes(currentInput.slice(-1))) {
+            // swap out old operator instead of staking them up
+            currentInput = currentInput.slice(0, -1) + val;
+            display.innerText = currentInput;
+            return;
+        }
+
+        // Standard Appends
+        if (currentInput === '' && val === '.') {
+            currentInput = '0.';
+        } else {
+            currentInput += val;
+        }
+        
+        display.innerText = currentInput;
+    }
 });
